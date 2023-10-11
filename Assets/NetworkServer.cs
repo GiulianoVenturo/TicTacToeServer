@@ -161,3 +161,18 @@ public class NetworkServer : MonoBehaviour
     }
 
 }
+
+
+public static class ClientToServerSignifiers
+{
+    public const int CreateAccount = 0,
+                        Login = 1;
+}
+
+public static class ServerToClientSignifiers
+{
+    public const int LoginComplete = 0,
+                        LoginFailed = 1,
+                        AccountCreationComplete = 2,
+                        AccountCreationFailed = 3;
+}
