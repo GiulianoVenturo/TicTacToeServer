@@ -3,6 +3,8 @@ using UnityEngine.Assertions;
 using Unity.Collections;
 using Unity.Networking.Transport;
 using System.Text;
+using System.Collections.Generic;
+using System.Linq;
 
 //! NETWORK SERVER
 
@@ -17,6 +19,8 @@ public class NetworkServer : MonoBehaviour
     const ushort NetworkPort = 9001;
 
     const int MaxNumberOfClientConnections = 1000;
+
+    LinkedList<PlayerAccount> playerAccounts;
 
     void Start()
     {
@@ -33,6 +37,8 @@ public class NetworkServer : MonoBehaviour
             networkDriver.Listen();
 
         networkConnections = new NativeList<NetworkConnection>(MaxNumberOfClientConnections, Allocator.Persistent);
+
+        playerAccounts = new LinkedList<PlayerAccount>();
     }
 
     void OnDestroy()
@@ -45,13 +51,13 @@ public class NetworkServer : MonoBehaviour
     {
         #region Check Input and Send Msg
 
-        if (Input.GetKeyDown(KeyCode.A))
-        {
-            for (int i = 0; i < networkConnections.Length; i++)
-            {
-                SendMessageToClient("Hello client's world, sincerely your network server", networkConnections[i]);
-            }
-        }
+        // if (Input.GetKeyDown(KeyCode.A))
+        // {
+        //     for (int i = 0; i < networkConnections.Length; i++)
+        //     {
+        //         SendMessageToClient("Hello client's world, sincerely your network server", networkConnections[i]);
+        //     }
+        // }
 
         #endregion
 
@@ -105,7 +111,7 @@ public class NetworkServer : MonoBehaviour
                         streamReader.ReadBytes(buffer);
                         byte[] byteBuffer = buffer.ToArray();
                         string msg = Encoding.Unicode.GetString(byteBuffer);
-                        ProcessReceivedMsg(msg);
+                        ProcessReceivedMsg(msg, i);
                         buffer.Dispose();
                         break;
                     case NetworkEvent.Type.Disconnect:
@@ -138,9 +144,54 @@ public class NetworkServer : MonoBehaviour
         return true;
     }
 
-    private void ProcessReceivedMsg(string msg)
+    private void ProcessReceivedMsg(string msg, int connectionIndex)
     {
         Debug.Log("Msg received = " + msg);
+
+        string[] csv = msg.Split(',');
+        int signifier = int.Parse(csv[0]);
+
+        string u = csv[1];
+        string p = csv[2];
+        var filteredAccounts = playerAccounts.Where(account => account.Username == u);
+        bool accountExists = filteredAccounts.Any();
+
+        if (signifier == ClientToServerSignifiers.CreateAccount)
+        {
+            Debug.Log("Creating account...");
+            if (accountExists)
+            {
+                Debug.Log("Account already exists...");
+                SendMessageToClient("Account already exists...", networkConnections[connectionIndex]);
+            }
+            else
+            {
+                Debug.Log("Account successfully created...");
+                PlayerAccount newPlayerAccount = new PlayerAccount(u, p);
+                playerAccounts.AddLast(newPlayerAccount);
+                SendMessageToClient("Account successfully created...", networkConnections[connectionIndex]);
+                // save on hd?
+            }
+        }
+        else if (signifier == ClientToServerSignifiers.Login)
+        {
+            Debug.Log("Login account...");
+            if (accountExists)
+            {
+                PlayerAccount matchedAccount = filteredAccounts.FirstOrDefault();
+                if (matchedAccount.Password == p)
+                {
+                    SendMessageToClient("LoginCompleted", networkConnections[connectionIndex]);
+                }
+            }
+            else
+            {
+                Debug.Log("Account does not exist...");
+            }
+        }
+
+
+
     }
 
     public void SendMessageToClient(string msg, NetworkConnection networkConnection)
@@ -162,6 +213,16 @@ public class NetworkServer : MonoBehaviour
 
 }
 
+public class PlayerAccount
+{
+    public string Username { get; set; }
+    public string Password { get; set; }
+    public PlayerAccount(string username, string password)
+    {
+        Username = username;
+        Password = password;
+    }
+}
 
 public static class ClientToServerSignifiers
 {
