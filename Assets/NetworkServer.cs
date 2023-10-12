@@ -164,14 +164,14 @@ public class NetworkServer : MonoBehaviour
             if (accountExists)
             {
                 Debug.Log("Account already exists...");
-                SendMessageToClient("Account already exists...", networkConnections[connectionIndex]);
+                SendMessageToClient($"{ServerToClientSignifiers.AccountCreationFailed}", networkConnections[connectionIndex]);
             }
             else
             {
                 Debug.Log("Account successfully created...");
                 PlayerAccount newPlayerAccount = new PlayerAccount(u, p);
                 playerAccounts.AddLast(newPlayerAccount);
-                SendMessageToClient("Account successfully created...", networkConnections[connectionIndex]);
+                SendMessageToClient($"{ServerToClientSignifiers.AccountCreationComplete}", networkConnections[connectionIndex]);
                 SavePlayersAccounts();
             }
         }
@@ -183,12 +183,18 @@ public class NetworkServer : MonoBehaviour
                 PlayerAccount matchedAccount = filteredAccounts.FirstOrDefault();
                 if (matchedAccount.Password == p)
                 {
-                    SendMessageToClient("LoginCompleted", networkConnections[connectionIndex]);
+                    SendMessageToClient($"{ServerToClientSignifiers.LoginComplete}", networkConnections[connectionIndex]);
+                }
+                else
+                {
+                    Debug.Log("Incorrect password...");
+                    SendMessageToClient($"{ServerToClientSignifiers.LoginFailed}", networkConnections[connectionIndex]);
                 }
             }
             else
             {
-                Debug.Log("Account does not exist...");
+                Debug.Log("Username does not exist...");
+                SendMessageToClient($"{ServerToClientSignifiers.LoginFailed}", networkConnections[connectionIndex]);
             }
         }
 
