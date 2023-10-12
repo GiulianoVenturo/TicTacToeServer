@@ -22,6 +22,9 @@ public class NetworkServer : MonoBehaviour
     const int MaxNumberOfClientConnections = 1000;
 
     LinkedList<PlayerAccount> playerAccounts;
+    LinkedList<GameRoom> gameRooms;
+
+    int OnQueuePlayerIndex = -1;
 
     void Start()
     {
@@ -41,6 +44,7 @@ public class NetworkServer : MonoBehaviour
 
         playerAccounts = new LinkedList<PlayerAccount>();
         LoadPlayersAccounts();
+        gameRooms = new LinkedList<GameRoom>();
     }
 
     void OnDestroy()
@@ -153,14 +157,13 @@ public class NetworkServer : MonoBehaviour
         string[] csv = msg.Split(',');
         int signifier = int.Parse(csv[0]);
 
-        string u = csv[1];
-        string p = csv[2];
-        var filteredAccounts = playerAccounts.Where(account => account.Username == u);
-        bool accountExists = filteredAccounts.Any();
-
         if (signifier == ClientToServerSignifiers.CreateAccount)
         {
             Debug.Log("Creating account...");
+            string u = csv[1];
+            string p = csv[2];
+            var filteredAccounts = playerAccounts.Where(account => account.Username == u);
+            bool accountExists = filteredAccounts.Any();
             if (accountExists)
             {
                 Debug.Log("Account already exists...");
@@ -178,12 +181,17 @@ public class NetworkServer : MonoBehaviour
         else if (signifier == ClientToServerSignifiers.Login)
         {
             Debug.Log("Login account...");
+            string u = csv[1];
+            string p = csv[2];
+            var filteredAccounts = playerAccounts.Where(account => account.Username == u);
+            bool accountExists = filteredAccounts.Any();
             if (accountExists)
             {
                 PlayerAccount matchedAccount = filteredAccounts.FirstOrDefault();
                 if (matchedAccount.Password == p)
                 {
                     SendMessageToClient($"{ServerToClientSignifiers.LoginComplete}", networkConnections[connectionIndex]);
+                    Debug.Log("Login Complete!");
                 }
                 else
                 {
@@ -197,7 +205,31 @@ public class NetworkServer : MonoBehaviour
                 SendMessageToClient($"{ServerToClientSignifiers.LoginFailed}", networkConnections[connectionIndex]);
             }
         }
-
+        else if (signifier == ClientToServerSignifiers.OnQueue)
+        {
+            if (OnQueuePlayerIndex == -1)
+            {
+                Debug.Log("player on queue...");
+                OnQueuePlayerIndex = connectionIndex;
+            }
+            else
+            {
+                Debug.Log("gr created...");
+                GameRoom gr = new GameRoom(OnQueuePlayerIndex, connectionIndex);
+                gameRooms.AddLast(gr);
+                OnQueuePlayerIndex = -1;
+                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}", networkConnections[gameRooms.Last().p1Index]);
+                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}", networkConnections[gameRooms.Last().p2Index]);
+                GameplaySetUp();
+            }
+        }
+        else if (signifier == ClientToServerSignifiers.OnQueueAsViewer)
+        {
+            if (OnQueuePlayerIndex != -1)
+            {
+                gameRooms.Last().viewersIndexes.AddLast(connectionIndex);
+            }
+        }
     }
 
     public void SendMessageToClient(string msg, NetworkConnection networkConnection)
@@ -244,6 +276,22 @@ public class NetworkServer : MonoBehaviour
             }
         }
     }
+
+    public void GameplaySetUp()
+    {
+        int randomPlayer = Random.Range(0, 2);
+        if (randomPlayer == 0)
+        {
+            Debug.Log("Player 1 starts...");
+            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}", networkConnections[gameRooms.Last().p1Index]);
+        }
+        else
+        {
+            Debug.Log("Player 2 starts...");
+            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}", networkConnections[gameRooms.Last().p2Index]);
+        }
+    }
+
 }
 
 public class PlayerAccount
@@ -257,10 +305,25 @@ public class PlayerAccount
     }
 }
 
+public class GameRoom
+{
+    public int p1Index, p2Index;
+    public LinkedList<int> viewersIndexes;
+
+    public GameRoom(int P1Index, int P2Index)
+    {
+        p1Index = P1Index;
+        p2Index = P2Index;
+    }
+}
+
 public static class ClientToServerSignifiers
 {
     public const int CreateAccount = 0,
-                        Login = 1;
+                        Login = 1,
+                        OnQueue = 2,
+                        OnQueueAsViewer = 3,
+                        SendPlay = 4;
 }
 
 public static class ServerToClientSignifiers
@@ -268,5 +331,8 @@ public static class ServerToClientSignifiers
     public const int LoginComplete = 0,
                         LoginFailed = 1,
                         AccountCreationComplete = 2,
-                        AccountCreationFailed = 3;
+                        AccountCreationFailed = 3,
+                        GameRoomCreated = 4,
+                        YourTurn = 5,
+                        UpdateForViewers = 6;
 }
