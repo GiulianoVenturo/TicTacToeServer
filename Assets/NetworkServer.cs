@@ -5,6 +5,7 @@ using Unity.Networking.Transport;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 
 //! NETWORK SERVER
 
@@ -39,6 +40,7 @@ public class NetworkServer : MonoBehaviour
         networkConnections = new NativeList<NetworkConnection>(MaxNumberOfClientConnections, Allocator.Persistent);
 
         playerAccounts = new LinkedList<PlayerAccount>();
+        LoadPlayersAccounts();
     }
 
     void OnDestroy()
@@ -170,7 +172,7 @@ public class NetworkServer : MonoBehaviour
                 PlayerAccount newPlayerAccount = new PlayerAccount(u, p);
                 playerAccounts.AddLast(newPlayerAccount);
                 SendMessageToClient("Account successfully created...", networkConnections[connectionIndex]);
-                // save on hd?
+                SavePlayersAccounts();
             }
         }
         else if (signifier == ClientToServerSignifiers.Login)
@@ -189,8 +191,6 @@ public class NetworkServer : MonoBehaviour
                 Debug.Log("Account does not exist...");
             }
         }
-
-
 
     }
 
@@ -211,6 +211,33 @@ public class NetworkServer : MonoBehaviour
         buffer.Dispose();
     }
 
+    public void SavePlayersAccounts()
+    {
+        using (StreamWriter sw = new StreamWriter(Application.dataPath + Path.DirectorySeparatorChar + "PlayerAccounts.txt"))
+        {
+            foreach (PlayerAccount pa in playerAccounts)
+            {
+                sw.WriteLine(pa.Username + "," + pa.Password);
+            }
+        }
+    }
+
+    public void LoadPlayersAccounts()
+    {
+        if (!File.Exists(Application.dataPath + Path.DirectorySeparatorChar + "PlayerAccounts.txt"))
+            return;
+
+        using (StreamReader sr = new StreamReader(Application.dataPath + Path.DirectorySeparatorChar + "PlayerAccounts.txt"))
+        {
+            string line;
+            while ((line = sr.ReadLine()) != null)
+            {
+                string[] csv = line.Split(',');
+                PlayerAccount newPlayerAccount = new PlayerAccount(csv[0], csv[1]);
+                playerAccounts.AddLast(newPlayerAccount);
+            }
+        }
+    }
 }
 
 public class PlayerAccount
