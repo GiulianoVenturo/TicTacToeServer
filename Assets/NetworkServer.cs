@@ -207,20 +207,36 @@ public class NetworkServer : MonoBehaviour
         }
         else if (signifier == ClientToServerSignifiers.OnQueue)
         {
-            if (OnQueuePlayerIndex == -1)
+            string grName = csv[1];
+            var filteredGameRoomsNames = gameRooms.Where(gr => gr.Name == grName);
+            bool gameRoomNameExists = filteredGameRoomsNames.Any();
+
+            if (gameRoomNameExists)
             {
-                Debug.Log("player on queue...");
-                OnQueuePlayerIndex = connectionIndex;
+                Debug.Log("Player join gameRoom...");
+
+                GameRoom foundRoom = null;
+                foreach (var gr in gameRooms)
+                {
+                    if (gr.Name == grName)
+                    {
+                        foundRoom = gr;
+                        break;
+                    }
+                }
+                foundRoom.ncP2 = networkConnections[connectionIndex];
+                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}" + ",X", foundRoom.ncP1);
+                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}" + ",O", foundRoom.ncP2);
+                GameplaySetUp(foundRoom);
             }
+
             else
             {
                 Debug.Log("gr created...");
-                GameRoom gr = new GameRoom(OnQueuePlayerIndex, connectionIndex);
+                GameRoom gr = new GameRoom(grName);
+                gr.ncP1 = networkConnections[connectionIndex];
                 gameRooms.AddLast(gr);
-                OnQueuePlayerIndex = -1;
-                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}", networkConnections[gameRooms.Last().p1Index]);
-                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}", networkConnections[gameRooms.Last().p2Index]);
-                GameplaySetUp();
+                SendMessageToClient($"{ServerToClientSignifiers.WaitForOpponent}", gr.ncP1);
             }
         }
         else if (signifier == ClientToServerSignifiers.OnQueueAsViewer)
@@ -230,6 +246,37 @@ public class NetworkServer : MonoBehaviour
                 gameRooms.Last().viewersIndexes.AddLast(connectionIndex);
             }
         }
+        else if (signifier == ClientToServerSignifiers.LeaveQueue)
+        {
+            GameRoom foundRoom = null;
+            foreach (var gr in gameRooms)
+            {
+                if (gr.ncP1 == networkConnections[connectionIndex])
+                {
+                    foundRoom = gr;
+                    Debug.Log("Game room found for deleted...");
+                    break;
+                }
+            }
+            gameRooms.Remove(foundRoom);
+            Debug.Log("Game room removed..");
+        }
+        else if (signifier == ClientToServerSignifiers.Surrender)
+        {
+            GameRoom completedRoom = null;
+            foreach (var gr in gameRooms)
+            {
+                if (gr.IsPlayingOnGameRoom(networkConnections[connectionIndex]))
+                {
+                    SendMessageToClient($"{ServerToClientSignifiers.YouWin}", gr.GetOpponenetNetworkConnection(networkConnections[connectionIndex]));
+                    SendMessageToClient($"{ServerToClientSignifiers.YouLose}", networkConnections[connectionIndex]);
+                    completedRoom = gr;
+                }
+            }
+            gameRooms.Remove(completedRoom);
+            Debug.Log("Game room removed..");
+        }
+
     }
 
     public void SendMessageToClient(string msg, NetworkConnection networkConnection)
@@ -277,18 +324,18 @@ public class NetworkServer : MonoBehaviour
         }
     }
 
-    public void GameplaySetUp()
+    public void GameplaySetUp(GameRoom gr)
     {
         int randomPlayer = Random.Range(0, 2);
         if (randomPlayer == 0)
         {
             Debug.Log("Player 1 starts...");
-            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}", networkConnections[gameRooms.Last().p1Index]);
+            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}", gr.ncP1);
         }
         else
         {
             Debug.Log("Player 2 starts...");
-            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}", networkConnections[gameRooms.Last().p2Index]);
+            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}", gr.ncP2);
         }
     }
 
@@ -307,14 +354,30 @@ public class PlayerAccount
 
 public class GameRoom
 {
-    public int p1Index, p2Index;
+    public string Name { get; set; }
+    public NetworkConnection ncP1 { get; set; }
+    public NetworkConnection ncP2 { get; set; }
+
     public LinkedList<int> viewersIndexes;
 
-    public GameRoom(int P1Index, int P2Index)
+    public GameRoom(string name)
     {
-        p1Index = P1Index;
-        p2Index = P2Index;
+        Name = name;
     }
+
+    public NetworkConnection GetOpponenetNetworkConnection(NetworkConnection pc)
+    {
+        if (ncP1 == pc)
+            return ncP2;
+        return ncP1;
+    }
+    public bool IsPlayingOnGameRoom(NetworkConnection pc)
+    {
+        if (ncP1 == pc || ncP2 == pc)
+            return true;
+        return false;
+    }
+
 }
 
 public static class ClientToServerSignifiers
@@ -323,7 +386,9 @@ public static class ClientToServerSignifiers
                         Login = 1,
                         OnQueue = 2,
                         OnQueueAsViewer = 3,
-                        SendPlay = 4;
+                        LeaveQueue = 4,
+                        Surrender = 5,
+                        MyMove = 6;
 }
 
 public static class ServerToClientSignifiers
@@ -332,7 +397,10 @@ public static class ServerToClientSignifiers
                         LoginFailed = 1,
                         AccountCreationComplete = 2,
                         AccountCreationFailed = 3,
-                        GameRoomCreated = 4,
-                        YourTurn = 5,
-                        UpdateForViewers = 6;
+                        WaitForOpponent = 4,
+                        GameRoomCreated = 5,
+                        YourTurn = 6,
+                        UpdateForViewers = 7,
+                        YouWin = 8,
+                        YouLose = 9;
 }
