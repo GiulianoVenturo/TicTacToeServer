@@ -276,6 +276,20 @@ public class NetworkServer : MonoBehaviour
             gameRooms.Remove(completedRoom);
             Debug.Log("Game room removed..");
         }
+        else if (signifier == ClientToServerSignifiers.MyMove)
+        {
+            foreach (var gr in gameRooms)
+            {
+                if (gr.IsPlayingOnGameRoom(networkConnections[connectionIndex]))
+                {
+                    SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + "," + csv[1],
+                    gr.GetOpponenetNetworkConnection(networkConnections[connectionIndex]));
+                    Debug.Log("Room Found in ClientToServerSignifiers.MyMove");
+                    break;
+                }
+                Debug.Log("Room NOT found from ClientToServerSignifiers.MyMove");
+            }
+        }
 
     }
 
@@ -326,17 +340,19 @@ public class NetworkServer : MonoBehaviour
 
     public void GameplaySetUp(GameRoom gr)
     {
-        int randomPlayer = Random.Range(0, 2);
-        if (randomPlayer == 0)
-        {
-            Debug.Log("Player 1 starts...");
-            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}", gr.ncP1);
-        }
-        else
-        {
-            Debug.Log("Player 2 starts...");
-            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}", gr.ncP2);
-        }
+        //! change
+        SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + ",E", gr.ncP1);
+        // int randomPlayer = Random.Range(0, 2);
+        // if (randomPlayer == 0)
+        // {
+        //     Debug.Log("Player 1 starts...");
+        //     SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + ",E", gr.ncP1);
+        // }
+        // else
+        // {
+        //     Debug.Log("Player 2 starts...");
+        //     SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + ",E", gr.ncP2);
+        // }
     }
 
 }
