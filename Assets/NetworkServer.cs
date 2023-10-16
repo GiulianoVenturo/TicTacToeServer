@@ -307,6 +307,19 @@ public class NetworkServer : MonoBehaviour
             }
             gameRooms.Remove(completedRoom);
         }
+        else if (signifier == ClientToServerSignifiers.UseChatWheel)
+        {
+            foreach (var gr in gameRooms)
+            {
+                if (gr.IsPlayingOnGameRoom(networkConnections[connectionIndex]))
+                {
+                    SendMessageToClient($"{ServerToClientSignifiers.OpponentChatWheel}" + "," + csv[1],
+                    gr.GetOpponenetNetworkConnection(networkConnections[connectionIndex]));
+                    Debug.Log("SendMessage to opponent" + csv[1]);
+                    break;
+                }
+            }
+        }
     }
 
     public void SendMessageToClient(string msg, NetworkConnection networkConnection)
@@ -420,7 +433,8 @@ public static class ClientToServerSignifiers
                         LeaveQueue = 4,
                         Surrender = 5,
                         MyMove = 6,
-                        PlayerWin = 7;
+                        PlayerWin = 7,
+                        UseChatWheel = 8;
 }
 
 public static class ServerToClientSignifiers
@@ -434,5 +448,6 @@ public static class ServerToClientSignifiers
                         YourTurn = 6,
                         UpdateForViewers = 7,
                         YouWin = 8,
-                        YouLose = 9;
+                        YouLose = 9,
+                        OpponentChatWheel = 10;
 }
