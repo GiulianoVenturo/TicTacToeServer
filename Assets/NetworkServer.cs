@@ -270,7 +270,7 @@ public class NetworkServer : MonoBehaviour
                 if (gr.IsPlayingOnGameRoom(networkConnections[connectionIndex]))
                 {
                     SendMessageToClient($"{ServerToClientSignifiers.YouWin}", gr.GetOpponenetNetworkConnection(networkConnections[connectionIndex]));
-                    SendMessageToClient($"{ServerToClientSignifiers.YouLose}", networkConnections[connectionIndex]);
+                    //SendMessageToClient($"{ServerToClientSignifiers.YouLose},E", networkConnections[connectionIndex]);
                     completedRoom = gr;
                     Debug.Log("Game room removed..");
                     break;
