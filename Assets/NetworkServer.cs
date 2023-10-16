@@ -6,6 +6,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using UnityEditor;
 
 //! NETWORK SERVER
 
@@ -271,10 +272,11 @@ public class NetworkServer : MonoBehaviour
                     SendMessageToClient($"{ServerToClientSignifiers.YouWin}", gr.GetOpponenetNetworkConnection(networkConnections[connectionIndex]));
                     SendMessageToClient($"{ServerToClientSignifiers.YouLose}", networkConnections[connectionIndex]);
                     completedRoom = gr;
+                    Debug.Log("Game room removed..");
+                    break;
                 }
             }
             gameRooms.Remove(completedRoom);
-            Debug.Log("Game room removed..");
         }
         else if (signifier == ClientToServerSignifiers.MyMove)
         {
@@ -290,7 +292,21 @@ public class NetworkServer : MonoBehaviour
                 Debug.Log("Room NOT found from ClientToServerSignifiers.MyMove");
             }
         }
-
+        else if (signifier == ClientToServerSignifiers.PlayerWin)
+        {
+            GameRoom completedRoom = null;
+            foreach (var gr in gameRooms)
+            {
+                if (gr.IsPlayingOnGameRoom(networkConnections[connectionIndex]))
+                {
+                    SendMessageToClient($"{ServerToClientSignifiers.YouWin}", networkConnections[connectionIndex]);
+                    SendMessageToClient($"{ServerToClientSignifiers.YouLose}" + "," + csv[1], gr.GetOpponenetNetworkConnection(networkConnections[connectionIndex]));
+                    completedRoom = gr;
+                    break;
+                }
+            }
+            gameRooms.Remove(completedRoom);
+        }
     }
 
     public void SendMessageToClient(string msg, NetworkConnection networkConnection)
@@ -340,19 +356,18 @@ public class NetworkServer : MonoBehaviour
 
     public void GameplaySetUp(GameRoom gr)
     {
-        //! change
-        SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + ",E", gr.ncP1);
-        // int randomPlayer = Random.Range(0, 2);
-        // if (randomPlayer == 0)
-        // {
-        //     Debug.Log("Player 1 starts...");
-        //     SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + ",E", gr.ncP1);
-        // }
-        // else
-        // {
-        //     Debug.Log("Player 2 starts...");
-        //     SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + ",E", gr.ncP2);
-        // }
+        //SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + ",E", gr.ncP1);
+        int randomPlayer = Random.Range(0, 2);
+        if (randomPlayer == 0)
+        {
+            Debug.Log("Player 1 starts...");
+            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + ",E", gr.ncP1);
+        }
+        else
+        {
+            Debug.Log("Player 2 starts...");
+            SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + ",E", gr.ncP2);
+        }
     }
 
 }
@@ -404,7 +419,8 @@ public static class ClientToServerSignifiers
                         OnQueueAsViewer = 3,
                         LeaveQueue = 4,
                         Surrender = 5,
-                        MyMove = 6;
+                        MyMove = 6,
+                        PlayerWin = 7;
 }
 
 public static class ServerToClientSignifiers
