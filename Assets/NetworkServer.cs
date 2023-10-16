@@ -341,6 +341,10 @@ public class NetworkServer : MonoBehaviour
                     SendMessageToClient($"{ServerToClientSignifiers.YouWin}", networkConnections[connectionIndex]);
                     SendMessageToClient($"{ServerToClientSignifiers.YouLose}" + "," + csv[1], gr.GetOpponenetNetworkConnection(networkConnections[connectionIndex]));
                     completedRoom = gr;
+                    foreach (var ncv in gr.ncViewers)
+                    {
+                        SendMessageToClient($"{ServerToClientSignifiers.YouLose}" + "," + csv[1], ncv);
+                    }
                     break;
                 }
             }
