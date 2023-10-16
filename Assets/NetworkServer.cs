@@ -25,7 +25,7 @@ public class NetworkServer : MonoBehaviour
     LinkedList<PlayerAccount> playerAccounts;
     LinkedList<GameRoom> gameRooms;
 
-    int OnQueuePlayerIndex = -1;
+    //int OnQueuePlayerIndex = -1;
 
     void Start()
     {
@@ -226,9 +226,14 @@ public class NetworkServer : MonoBehaviour
                     }
                 }
                 foundRoom.ncP2 = networkConnections[connectionIndex];
-                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}" + ",X", foundRoom.ncP1);
-                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}" + ",O", foundRoom.ncP2);
+                foundRoom.hasStarted = true;
+                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}" + ",X," + $"{foundRoom.ncViewers.Count()}", foundRoom.ncP1);
+                SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}" + ",O," + $"{foundRoom.ncViewers.Count()}", foundRoom.ncP2);
                 GameplaySetUp(foundRoom);
+                foreach (var ncv in foundRoom.ncViewers)
+                {
+                    SendMessageToClient($"{ServerToClientSignifiers.GameRoomCreated}" + ",V," + $"{foundRoom.ncViewers.Count()}", ncv);
+                }
             }
 
             else
@@ -242,14 +247,24 @@ public class NetworkServer : MonoBehaviour
         }
         else if (signifier == ClientToServerSignifiers.OnQueueAsViewer)
         {
-            if (OnQueuePlayerIndex != -1)
+            string grName = csv[1];
+            var filteredGameRoomsNames = gameRooms.Where(gr => gr.Name == grName);
+            foreach (var gr in gameRooms)
             {
-                gameRooms.Last().viewersIndexes.AddLast(connectionIndex);
+                if (gr.Name == grName)
+                {
+                    if (gr.hasStarted)
+                        return;
+                    gr.ncViewers.AddLast(networkConnections[connectionIndex]);
+                    break;
+
+                }
             }
         }
         else if (signifier == ClientToServerSignifiers.LeaveQueue)
         {
             GameRoom foundRoom = null;
+            GameRoom viewerInRoom = null;
             foreach (var gr in gameRooms)
             {
                 if (gr.ncP1 == networkConnections[connectionIndex])
@@ -258,9 +273,25 @@ public class NetworkServer : MonoBehaviour
                     Debug.Log("Game room found for deleted...");
                     break;
                 }
+                foreach (var ncv in gr.ncViewers)
+                {
+                    if (ncv == networkConnections[connectionIndex])
+                    {
+                        viewerInRoom = gr;
+                        break;
+                    }
+                }
             }
-            gameRooms.Remove(foundRoom);
-            Debug.Log("Game room removed..");
+            if (foundRoom != null)
+            {
+                gameRooms.Remove(foundRoom);
+                Debug.Log("Game room removed..");
+            }
+            if (viewerInRoom != null)
+            {
+                viewerInRoom.ncViewers.Remove(networkConnections[connectionIndex]);
+                Debug.Log("Deleted viewer");
+            }
         }
         else if (signifier == ClientToServerSignifiers.Surrender)
         {
@@ -287,6 +318,14 @@ public class NetworkServer : MonoBehaviour
                     SendMessageToClient($"{ServerToClientSignifiers.YourTurn}" + "," + csv[1],
                     gr.GetOpponenetNetworkConnection(networkConnections[connectionIndex]));
                     Debug.Log("Room Found in ClientToServerSignifiers.MyMove");
+                    foreach (var ncv in gr.ncViewers)
+                    {
+                        if (gr.ncP1 == networkConnections[connectionIndex])
+                            SendMessageToClient($"{ServerToClientSignifiers.UpdateForViewers}" + "," + csv[1] + ",p1", ncv);
+                        else
+                            SendMessageToClient($"{ServerToClientSignifiers.UpdateForViewers}" + "," + csv[1] + ",p2", ncv);
+
+                    }
                     break;
                 }
                 Debug.Log("Room NOT found from ClientToServerSignifiers.MyMove");
@@ -401,12 +440,13 @@ public class GameRoom
     public string Name { get; set; }
     public NetworkConnection ncP1 { get; set; }
     public NetworkConnection ncP2 { get; set; }
-
-    public LinkedList<int> viewersIndexes;
+    public bool hasStarted = false;
+    public LinkedList<NetworkConnection> ncViewers;
 
     public GameRoom(string name)
     {
         Name = name;
+        ncViewers = new LinkedList<NetworkConnection>();
     }
 
     public NetworkConnection GetOpponenetNetworkConnection(NetworkConnection pc)
